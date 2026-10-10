@@ -1,0 +1,54 @@
+name: Pin verified image for Vast template
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: Verified complete image sha256 digest
+        required: true
+        type: string
+permissions:
+  contents: read
+  packages: write
+jobs:
+  pin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tools/install-crane.sh
+      - name: Authenticate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/login-registry.py
+      - name: Pin the complete manifest to a digest-specific deployment tag
+        env:
+          IMAGE_DIGEST: ${{ inputs.digest }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re, subprocess
+          lock = json.loads(pathlib.Path('model-lock.json').read_text())
+          digest = os.environ['IMAGE_DIGEST']
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest)
+          ref = lock['image']+'@'+digest
+          def crane(*args):
+              result = subprocess.run(['crane', *args], capture_output=True)
+              if result.returncode:
+                  raise SystemExit('Registry pin command failed: '+args[0])
+              return result.stdout
+          assert crane('digest', ref).decode().strip() == digest
+          manifest = json.loads(crane('manifest', ref))
+          config = json.loads(crane('config', ref))
+          assert len(manifest['layers']) == len(config['rootfs']['diff_ids']) == 123
+          env = dict(entry.split('=', 1) for entry in config['config']['Env'])
+          assert env['CONTEXT_LENGTH'] == '786432' and env['CLIENT_OUTPUT_BUDGET'] == '65536'
+          assert env['MODEL_DIR'] == lock['model_dir'] and env['HUIHUI_MODEL_BAKED'] == '1'
+          tag = '768k-'+lock['revision'][:8]+'-'+digest.split(':')[1][:12]
+          crane('tag', ref, tag)
+          assert crane('digest', lock['image']+':'+tag).decode().strip() == digest
+          pathlib.Path('deployment-tag.json').write_text(json.dumps({'image':lock['image'], 'tag':tag, 'digest':digest, 'image_ref':ref, 'context_length':786432, 'client_output_budget':65536}, indent=2)+'\n')
+          print('DIGEST_SPECIFIC_TEMPLATE_TAG_VERIFIED', tag, digest)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployment-tag
+          path: deployment-tag.json
