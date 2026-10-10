@@ -1,0 +1,21 @@
+{
+  "image": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked",
+  "tag": "768k-fb12424e-v1",
+  "digest": "sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00",
+  "image_ref": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked@sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00",
+  "layers": 123,
+  "compressed_bytes": 190667107056,
+  "model_bytes": 179176277488,
+  "model_revision": "fb12424e973ee12f7a13cf01e81128d5337bb407",
+  "model_lock_sha256": "0a57f0d5d3cc9a7487710c49ba2c83163c0968889ec381865e2a71b8b06fde41",
+  "context_length": 786432,
+  "client_output_budget": 65536,
+  "shards": 90,
+  "all_archived_artifact_sha256_verified": true,
+  "all_registry_blob_sizes_verified": true,
+  "extracted_receipt_stat_check_passed": true,
+  "runtime_base_layers_preserved": true,
+  "registry_manifest_and_config_readback_verified": true,
+  "gpu_cold_start_tested": false,
+  "deployment_tag": "768k-fb12424e-2a4fac4fd9c9"
+}

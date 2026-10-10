@@ -1,0 +1,26 @@
+{
+  "image": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked",
+  "tag": "768k-fb12424e-v1",
+  "digest": "sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00",
+  "anonymous_manifest_config_verified": true,
+  "anonymous_blob_head_count": 123,
+  "all_blob_sizes_match": true,
+  "metadata_readback": {
+    "anonymous_metadata_blob_http": 200,
+    "metadata_blob_digest_verified": true,
+    "all_metadata_file_sha256_readback_verified": true,
+    "all_baked_deploy_scripts_match_source": true,
+    "full_110_file_receipt_verified": true,
+    "mtime_ns_expected": 0,
+    "metadata_layer": "sha256:b58c8c1922092a4f32cf5901fe72f52f450495086cfc76ae7f8e485eca7e60cd"
+  },
+  "weight_range_readback": {
+    "anonymous_weight_range_http": 206,
+    "ranged_blob_size_verified": true,
+    "tar_first_file_name_size_mtime_verified": true,
+    "safetensors_prefix_matches_nas": true,
+    "sample_bytes": 65536,
+    "layer": "sha256:b721fc24eb5a229a4dd87d4fba0669aed2ec3c67bc3eb3f5dd53498292b9ab30"
+  },
+  "gpu_cold_start_tested": false
+}

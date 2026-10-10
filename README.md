@@ -6,8 +6,13 @@ Docker image. A new Vast instance reads the model directly from the image after
 image loading completes; there is no Hugging Face download or second model copy
 at container startup.
 
-Image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-v1`.
-The immutable digest and build evidence are produced by the publication workflow.
+Deployment image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-2a4fac4fd9c9`.
+
+Immutable digest: `sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00`.
+
+The complete compressed image is 190.7 GB. Use the digest-specific
+tag above for Vast; the `768k-fb12424e-v1` tag is a release alias.
+[Published build receipt](release.json) includes file and registry verification results.
 
 ## Defaults
 
