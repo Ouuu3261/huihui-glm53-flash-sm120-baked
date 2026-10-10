@@ -1,0 +1,117 @@
+name: Publish GLM image with baked weights
+on:
+  push:
+    branches: [main]
+    paths: ['model-lock.json', 'deploy/**', 'tools/**', '.github/workflows/publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: glm-baked-publish
+  cancel-in-progress: false
+jobs:
+  base:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests==2.32.5
+      - run: bash tools/install-crane.sh
+      - name: Authenticate with job-scoped package permission
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/login-registry.py
+      - name: Offline build and startup checks
+        run: |
+          python -m unittest discover -s tests -v
+          for script in deploy/*.sh; do bash -n "$script"; done
+      - name: Preserve and publish pinned runtime layers
+        run: python tools/build_image.py base --output evidence/base.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-base
+          path: evidence/base.json
+  metadata:
+    needs: base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests==2.32.5
+      - run: bash tools/install-crane.sh
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq pigz
+      - name: Authenticate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/login-registry.py
+      - name: Verify and bake all metadata, launchers, and stat receipt
+        run: python tools/build_image.py metadata --output evidence/metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metadata
+          path: evidence/metadata.json
+  weights:
+    needs: base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        group: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests==2.32.5
+      - run: bash tools/install-crane.sh
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq pigz
+      - name: Authenticate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/login-registry.py
+      - name: Verify, pack, and upload two weight shards
+        env:
+          WEIGHT_GROUP: ${{ matrix.group }}
+        run: |
+          printf -v artifact '%02d' "$WEIGHT_GROUP"
+          python tools/build_image.py weights --group "$WEIGHT_GROUP" --output "evidence/weight-$artifact.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weights-${{ matrix.group }}
+          path: evidence/weight-*.json
+  assemble:
+    needs: [base, metadata, weights]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests==2.32.5
+      - run: bash tools/install-crane.sh
+      - uses: actions/download-artifact@v4
+        with:
+          path: evidence
+          merge-multiple: true
+      - name: Authenticate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/login-registry.py
+      - name: Assemble OCI image and verify all registry blobs and configuration
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/build_image.py assemble --evidence-dir evidence --output evidence/published-image.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glm-baked-image-evidence
+          path: evidence/*.json
