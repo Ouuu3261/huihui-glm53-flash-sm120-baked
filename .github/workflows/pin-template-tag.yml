@@ -38,11 +38,12 @@ jobs:
           assert crane('digest', ref).decode().strip() == digest
           manifest = json.loads(crane('manifest', ref))
           config = json.loads(crane('config', ref))
-          assert len(manifest['layers']) == len(config['rootfs']['diff_ids']) == 123
+          assert len(manifest['layers']) == len(config['rootfs']['diff_ids']) == 108
           env = dict(entry.split('=', 1) for entry in config['config']['Env'])
           assert env['CONTEXT_LENGTH'] == '786432' and env['CLIENT_OUTPUT_BUDGET'] == '65536'
           assert env['MODEL_DIR'] == lock['model_dir'] and env['HUIHUI_MODEL_BAKED'] == '1'
-          tag = '768k-'+lock['revision'][:8]+'-'+digest.split(':')[1][:12]
+          assert lock['release'] == 'v2'
+          tag = '768k-'+lock['revision'][:8]+'-'+lock['release']+'-'+digest.split(':')[1][:12]
           crane('tag', ref, tag)
           assert crane('digest', lock['image']+':'+tag).decode().strip() == digest
           pathlib.Path('deployment-tag.json').write_text(json.dumps({'image':lock['image'], 'tag':tag, 'digest':digest, 'image_ref':ref, 'context_length':786432, 'client_output_budget':65536}, indent=2)+'\n')

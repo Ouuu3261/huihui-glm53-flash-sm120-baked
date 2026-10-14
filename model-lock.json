@@ -3,7 +3,7 @@
   "revision": "fb12424e973ee12f7a13cf01e81128d5337bb407",
   "base_image": "ghcr.io/ormandj/sglang-glm53-flash-sm120@sha256:b4c2f4feb504dba6cb6358e480193a9cba1c9c6f5625dcefa926827b06c17c77",
   "image": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked",
-  "tag": "768k-fb12424e-v1",
+  "tag": "768k-fb12424e-v2",
   "source_url": "https://github.com/Ouuu3261/huihui-glm53-flash-sm120-baked",
   "model_dir": "/opt/models/Huihui-GLM-5.3-Flash-TP2-W4A16",
   "model_bytes": 179176277488,
@@ -12,7 +12,11 @@
   "context_length": 786432,
   "client_output_budget": 65536,
   "base_layer_count": 77,
-  "weight_layer_count": 45,
+  "release": "v2",
+  "weight_shards_per_layer": 3,
+  "weight_layer_count": 30,
+  "vast_ssh_wrapper_layer_budget": 6,
+  "overlay2_safe_image_layer_limit": 120,
   "files": [
     {
       "file": "LICENSE",

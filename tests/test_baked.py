@@ -75,7 +75,10 @@ class BakedStartupTests(unittest.TestCase):
                         archive.addfile(info, stream)
             target = root/'extract'; target.mkdir()
             with tarfile.open(path) as archive:
-                archive.extractall(target, filter='data')
+                try:
+                    archive.extractall(target, filter='data')
+                except TypeError:  # Local Python builds before the filter API.
+                    archive.extractall(target)
             verify.verify(target)
 
     def test_launch_profile_and_baked_path_are_fixed(self):
@@ -88,6 +91,20 @@ class BakedStartupTests(unittest.TestCase):
         self.assertIn('--max-running-requests 1', serve)
         self.assertIn('--context-length "$CONTEXT_LENGTH" --max-total-tokens "$CONTEXT_LENGTH"', serve)
         self.assertIn('--kv-cache-dtype fp8_e4m3', serve)
+
+    def test_vast_ssh_overlay_layer_headroom_is_reserved(self):
+        lock = json.loads((ROOT/'model-lock.json').read_text())
+        shards = [row for row in lock['files'] if row['file'].endswith('.safetensors')]
+        group_size = lock['weight_shards_per_layer']
+        groups = [shards[index:index+group_size] for index in range(0, len(shards), group_size)]
+        self.assertEqual(lock['release'], 'v2')
+        self.assertEqual(len(groups), lock['weight_layer_count'])
+        self.assertTrue(all(1 <= len(group) <= group_size for group in groups))
+        self.assertLess(max(sum(row['bytes'] for row in group) for group in groups), 10_000_000_000)
+        image_layers = lock['base_layer_count'] + lock['weight_layer_count'] + 1
+        self.assertEqual(image_layers, 108)
+        self.assertLessEqual(image_layers, lock['overlay2_safe_image_layer_limit'])
+        self.assertLessEqual(image_layers + lock['vast_ssh_wrapper_layer_budget'], lock['overlay2_safe_image_layer_limit'])
 
 
 if __name__ == '__main__':

@@ -6,13 +6,16 @@ Docker image. A new Vast instance reads the model directly from the image after
 image loading completes; there is no Hugging Face download or second model copy
 at container startup.
 
-Deployment image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-2a4fac4fd9c9`.
+Deployment image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-v2`.
 
-Immutable digest: `sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00`.
+The publication workflow produces a digest-specific `v2` deployment tag and a
+verified [build receipt](release.json). Use that tag in Vast rather than the
+historical v1 image.
 
-The complete compressed image is 190.7 GB. Use the digest-specific
-tag above for Vast; the `768k-fb12424e-v1` tag is a release alias.
-[Published build receipt](release.json) includes file and registry verification results.
+The v1 image verified and downloaded correctly, but it had 123 layers. Vast SSH
+adds setup layers before it starts the container, which triggered Docker's
+`max depth exceeded` guard. v2 reduces the image to 108 layers without changing
+the model, runtime, context, or output settings.
 
 ## Defaults
 
@@ -68,9 +71,11 @@ maxTokens / request max_tokens: `65536`.
 - `model-lock.json` fixes every artifact's size and SHA256. All 90 shards and
   published metadata are checked before and during packing. Tensor bytes and the
   Huihui conversion are unchanged.
-- 77 preserved runtime layers + 45 paired weight layers + 1 metadata layer =
-  123 layers. Each newly built weight layer contains two shards, below GHCR's
-  per-layer size cap. Fixed epoch mtimes allow cheap receipt checks at startup.
+- 77 preserved runtime layers + 30 three-shard weight layers + 1 metadata layer =
+  108 layers. This reserves twenty layers for Vast's SSH setup image and the
+  writable container layer, below overlay2's 128-layer limit. Each weight layer
+  has at most 6.11 GB of uncompressed shard input, below GHCR's per-layer size cap.
+  Fixed epoch mtimes allow cheap receipt checks at startup.
 - The workflow publishes layers independently with bounded runner disk usage,
   then assembles an OCI image from their verified descriptors. Intermediate
   `weights-*`, `metadata-*`, and `runtime-base-v05` tags are build caches, not

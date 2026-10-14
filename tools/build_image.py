@@ -27,7 +27,12 @@ OCI_LAYER = 'application/vnd.oci.image.layer.v1.tar+gzip'
 SOURCE_LABEL = 'org.opencontainers.image.source'
 MODEL_PREFIX = LOCK['model_dir'].lstrip('/')
 DEPLOY_PREFIX = 'opt/huihui-deploy'
-RECIPE = 'paired-safetensors-gzip-mtime0-v1'
+RELEASE = LOCK['release']
+WEIGHT_SHARDS_PER_LAYER = LOCK['weight_shards_per_layer']
+WEIGHT_LAYER_COUNT = LOCK['weight_layer_count']
+VAST_SSH_WRAPPER_LAYER_BUDGET = LOCK['vast_ssh_wrapper_layer_budget']
+OVERLAY2_SAFE_IMAGE_LAYER_LIMIT = LOCK['overlay2_safe_image_layer_limit']
+RECIPE = 'triple-safetensors-gzip-mtime0-v2'
 
 
 def dump(path, value):
@@ -169,9 +174,11 @@ def fragment(ref, layer_path, descriptor, diff_id, details):
 
 def weights(group, evidence):
     shards = [row for row in LOCK['files'] if row['file'].endswith('.safetensors')]
-    rows = shards[group*2:group*2+2]
-    assert 0 <= group < 45 and len(rows) == 2
-    ref = LOCK['image']+':weights-'+LOCK['revision'][:8]+'-'+f'{group+1:02d}'
+    expected_groups = (len(shards)+WEIGHT_SHARDS_PER_LAYER-1)//WEIGHT_SHARDS_PER_LAYER
+    assert expected_groups == WEIGHT_LAYER_COUNT
+    rows = shards[group*WEIGHT_SHARDS_PER_LAYER:(group+1)*WEIGHT_SHARDS_PER_LAYER]
+    assert 0 <= group < WEIGHT_LAYER_COUNT and 1 <= len(rows) <= WEIGHT_SHARDS_PER_LAYER
+    ref = LOCK['image']+':weights-'+LOCK['revision'][:8]+'-'+RELEASE+'-'+f'{group+1:02d}'
     existing = remote_image(ref, optional=True)
     if existing:
         raw, manifest, config = existing
@@ -184,12 +191,12 @@ def weights(group, evidence):
         raise RuntimeError('Existing fragment differs from the locked build')
     with tempfile.TemporaryDirectory(prefix='huihui-weight-') as temporary:
         root = pathlib.Path(temporary)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(rows)) as pool:
             list(pool.map(lambda row: download(row, root/row['file']), rows))
         output = root/'layer.tar.gz'
         files = [(MODEL_PREFIX+'/'+row['file'], root/row['file'], row['sha256'], 0o644) for row in rows]
         descriptor, diff_id, uncompressed = create_layer(output, files)
-        # Remove the two verified sources before upload to bound peak disk use.
+        # Remove verified source shards before upload to bound peak runner disk use.
         for row in rows:
             (root/row['file']).unlink()
         details = {'group': group, 'files': rows, 'uncompressed_bytes': uncompressed,
@@ -203,7 +210,7 @@ def base(evidence):
     _, original, original_config = remote_image(LOCK['base_image'])
     assert len(original['layers']) == len(original_config['rootfs']['diff_ids']) == LOCK['base_layer_count']
     assert original_config['os'] == 'linux' and original_config['architecture'] == 'amd64'
-    ref = LOCK['image']+':runtime-base-v05'
+    ref = LOCK['image']+':runtime-base-v05-'+RELEASE
     crane('mutate', LOCK['base_image'], '--label', SOURCE_LABEL+'='+LOCK['source_url'], '--tag', ref)
     raw, manifest, config = remote_image(ref)
     assert manifest['layers'] == original['layers']
@@ -244,7 +251,7 @@ def metadata(evidence):
         subprocess.run(['python3', str(HERE/'deploy/verify_baked_model.py')], env={**os.environ, 'MODEL_DIR': str(model)}, check=True)
         details = {'files': rows, 'uncompressed_bytes': uncompressed, 'mtime': 0,
                    'archived_file_sha256_verified': True, 'extracted_receipt_stat_check_passed': True}
-        record = fragment(LOCK['image']+':metadata-'+LOCK['revision'][:8]+'-v1', root/'metadata.tar.gz', descriptor, diff_id, details)
+        record = fragment(LOCK['image']+':metadata-'+LOCK['revision'][:8]+'-'+RELEASE, root/'metadata.tar.gz', descriptor, diff_id, details)
         dump(evidence, record)
     print('METADATA_AND_BOOT_RECEIPT_PUBLISHED', flush=True)
 
@@ -299,7 +306,7 @@ def assemble(evidence_dir, output):
     root = pathlib.Path(evidence_dir)
     base_record = json.loads((root/'base.json').read_text())
     metadata_record = json.loads((root/'metadata.json').read_text())
-    weights_records = [json.loads((root/f'weight-{i:02d}.json').read_text()) for i in range(45)]
+    weights_records = [json.loads((root/f'weight-{i:02d}.json').read_text()) for i in range(WEIGHT_LAYER_COUNT)]
     rows = [row for record in weights_records for row in record['files']]
     assert rows == [row for row in LOCK['files'] if row['file'].endswith('.safetensors')]
     assert sum(row['bytes'] for row in rows) == LOCK['shard_bytes']
@@ -317,14 +324,20 @@ def assemble(evidence_dir, output):
     runtime['Labels'] = {**runtime.get('Labels', {}), SOURCE_LABEL: LOCK['source_url'],
                          'org.opencontainers.image.description': 'Huihui GLM-5.3-Flash TP2, all weights baked; 768K total context, 64K client output budget',
                          'ai.huihui.model.repository': LOCK['repository'], 'ai.huihui.model.revision': LOCK['revision'],
-                         'ai.huihui.model-lock.sha256': LOCK_SHA, 'ai.huihui.model.baked': 'true'}
+                         'ai.huihui.model-lock.sha256': LOCK_SHA, 'ai.huihui.model.baked': 'true',
+                         'ai.huihui.image.release': RELEASE,
+                         'ai.huihui.overlay2.safe-image-layer-limit': str(OVERLAY2_SAFE_IMAGE_LAYER_LIMIT)}
     runtime['Entrypoint'] = ['/opt/nvidia/nvidia_entrypoint.sh']
     runtime['Cmd'] = ['bash', '/opt/huihui-deploy/start-baked.sh']
     runtime['WorkingDir'] = '/workspace'
     # VOLUME declarations could hide immutable model files or allocate a second copy.
     assert not any(LOCK['model_dir'].startswith(path.rstrip('/')+'/') or path == LOCK['model_dir'] for path in runtime.get('Volumes', {}))
     layers = base_record['manifest']['layers']+[record['layer'] for record in records]
-    assert len(layers) == len(config['rootfs']['diff_ids']) == 123 and len(layers) < 128
+    assert len(layers) == len(config['rootfs']['diff_ids']) == LOCK['base_layer_count'] + WEIGHT_LAYER_COUNT + 1
+    assert len(layers) <= OVERLAY2_SAFE_IMAGE_LAYER_LIMIT
+    # Vast SSH mode creates setup layers on top and then needs a writable layer.
+    # Keep a deliberate margin below overlay2's 128 lower-layer ceiling.
+    assert len(layers) + VAST_SSH_WRAPPER_LAYER_BUDGET <= OVERLAY2_SAFE_IMAGE_LAYER_LIMIT
     assert max(layer['size'] for layer in layers) < 10_000_000_000
     registry = Registry()
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
@@ -343,7 +356,10 @@ def assemble(evidence_dir, output):
               'model_revision': LOCK['revision'], 'model_lock_sha256': LOCK_SHA, 'context_length': 786432, 'client_output_budget': 65536,
               'shards': 90, 'all_archived_artifact_sha256_verified': True, 'all_registry_blob_sizes_verified': True,
               'extracted_receipt_stat_check_passed': True, 'runtime_base_layers_preserved': True,
-              'registry_manifest_and_config_readback_verified': True, 'gpu_cold_start_tested': False}
+              'registry_manifest_and_config_readback_verified': True,
+              'overlay2_safe_image_layer_limit': OVERLAY2_SAFE_IMAGE_LAYER_LIMIT,
+              'vast_ssh_wrapper_layer_budget': VAST_SSH_WRAPPER_LAYER_BUDGET,
+              'gpu_cold_start_tested': False}
     dump(output, report); dump(pathlib.Path(output).with_name('final-manifest.json'), manifest); dump(pathlib.Path(output).with_name('final-config.json'), config)
     print('BAKED_IMAGE_PUBLISHED_AND_VERIFIED', json.dumps(report), flush=True)
 

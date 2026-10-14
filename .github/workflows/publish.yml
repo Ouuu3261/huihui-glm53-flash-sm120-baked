@@ -60,12 +60,12 @@ jobs:
   weights:
     needs: base
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       max-parallel: 16
       matrix:
-        group: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+        group: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -78,7 +78,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/login-registry.py
-      - name: Verify, pack, and upload two weight shards
+      - name: Verify, pack, and upload three weight shards
         env:
           WEIGHT_GROUP: ${{ matrix.group }}
         run: |
