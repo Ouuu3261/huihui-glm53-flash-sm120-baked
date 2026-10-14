@@ -6,11 +6,13 @@ Docker image. A new Vast instance reads the model directly from the image after
 image loading completes; there is no Hugging Face download or second model copy
 at container startup.
 
-Deployment image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-v2`.
+Deployment image: `ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked:768k-fb12424e-v2-3d65d275639a`.
 
-The publication workflow produces a digest-specific `v2` deployment tag and a
-verified [build receipt](release.json). Use that tag in Vast rather than the
-historical v1 image.
+Immutable digest: `sha256:3d65d275639acaa5d77ffb5c91d2868ff26885cbadbdbc7e661f12cd217917e2`.
+
+The complete compressed image is 190.7 GB. Use the digest-specific v2 tag above
+in Vast. [Published build receipt](release.json) and
+[public verification](public-verification.json) describe the final image.
 
 The v1 image verified and downloaded correctly, but it had 123 layers. Vast SSH
 adds setup layers before it starts the container, which triggered Docker's

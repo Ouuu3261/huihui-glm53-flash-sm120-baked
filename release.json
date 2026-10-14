@@ -1,13 +1,13 @@
 {
   "image": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked",
-  "tag": "768k-fb12424e-v1",
-  "digest": "sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00",
-  "image_ref": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked@sha256:2a4fac4fd9c9efa33d088d65d68afe338b6785d00f80da9730f751a59b2c3b00",
-  "layers": 123,
-  "compressed_bytes": 190667107056,
+  "tag": "768k-fb12424e-v2",
+  "digest": "sha256:3d65d275639acaa5d77ffb5c91d2868ff26885cbadbdbc7e661f12cd217917e2",
+  "image_ref": "ghcr.io/ouuu3261/huihui-glm53-flash-sm120-baked@sha256:3d65d275639acaa5d77ffb5c91d2868ff26885cbadbdbc7e661f12cd217917e2",
+  "layers": 108,
+  "compressed_bytes": 190666988950,
   "model_bytes": 179176277488,
   "model_revision": "fb12424e973ee12f7a13cf01e81128d5337bb407",
-  "model_lock_sha256": "0a57f0d5d3cc9a7487710c49ba2c83163c0968889ec381865e2a71b8b06fde41",
+  "model_lock_sha256": "b8ec020804f3e3e7ed488ab7156a04b7a0074a64fedcbd048abd0a6e9f8fa09a",
   "context_length": 786432,
   "client_output_budget": 65536,
   "shards": 90,
@@ -16,6 +16,8 @@
   "extracted_receipt_stat_check_passed": true,
   "runtime_base_layers_preserved": true,
   "registry_manifest_and_config_readback_verified": true,
+  "overlay2_safe_image_layer_limit": 120,
+  "vast_ssh_wrapper_layer_budget": 6,
   "gpu_cold_start_tested": false,
-  "deployment_tag": "768k-fb12424e-2a4fac4fd9c9"
+  "deployment_tag": "768k-fb12424e-v2-3d65d275639a"
 }
